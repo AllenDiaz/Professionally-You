@@ -10,6 +10,13 @@ from .config import get_settings
 from .profile import load_profile
 
 
+def get_person_name() -> str:
+    """Return the persona's display name (profile override, else settings default)."""
+    settings = get_settings()
+    profile = load_profile()
+    return profile.name or settings.person_name
+
+
 def build_system_prompt(user_message: str | None = None) -> str:
     settings = get_settings()
     profile = load_profile()

@@ -5,15 +5,18 @@ tool-calling loop is now bounded by ``settings.max_tool_iterations`` instead of
 being an unbounded ``while`` loop. If the cap is reached, a final call without
 tools forces a plain text answer.
 
-Phase 4 adds a streaming variant; this synchronous path stays as the
-non-streaming implementation (also used later by the evaluator).
+Phase 4 adds an input guardrail before the model runs and an output evaluator
+after — with a single feedback-guided retry if the evaluator rejects the draft.
+See ``stream.py`` for the streaming counterpart (guardrail only; evaluating a
+full reply before releasing it would defeat the point of streaming).
 """
 
 import logging
 
+from . import guardrails
 from .config import get_settings
 from .context import conversation_scope
-from .prompt import build_system_prompt
+from .prompt import build_system_prompt, get_person_name
 from .tools import TOOLS, handle_tool_calls
 from .vertex import vertex_client
 
@@ -32,8 +35,15 @@ def run_chat(
     """
     settings = get_settings()
     history = history or []
+
+    allowed, reason = guardrails.check_input(message)
+    if not allowed:
+        logger.info("Input blocked by guardrail: %s", reason)
+        return guardrails.GUARDRAIL_REDIRECT_MESSAGE
+
+    system_prompt = build_system_prompt(message)
     messages: list = (
-        [{"role": "system", "content": build_system_prompt(message)}]
+        [{"role": "system", "content": system_prompt}]
         + list(history)
         + [{"role": "user", "content": message}]
     )
@@ -41,6 +51,25 @@ def run_chat(
     client = vertex_client()
 
     with conversation_scope(conversation_id):
+        draft = _run_loop(client, settings, messages)
+
+        acceptable, feedback = guardrails.evaluate_reply(
+            get_person_name(), system_prompt, message, draft
+        )
+        if acceptable:
+            return draft
+
+        logger.info("Evaluator rejected draft reply; retrying once: %s", feedback)
+        messages.append({"role": "assistant", "content": draft})
+        messages.append(
+            {
+                "role": "user",
+                "content": (
+                    "Your previous reply failed an internal quality check: "
+                    f"{feedback}\nPlease provide a corrected reply."
+                ),
+            }
+        )
         return _run_loop(client, settings, messages)
 
 
