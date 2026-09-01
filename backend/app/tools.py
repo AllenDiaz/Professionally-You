@@ -9,18 +9,44 @@ model-controlled arguments.
 import json
 import logging
 
-from . import pushover
+from . import crud, pushover
+from .context import get_conversation_id
+from .db import SessionLocal
 
 logger = logging.getLogger(__name__)
 
 
+def _persist(write) -> None:
+    """Run a best-effort DB write; a failure must never break a chat turn."""
+    try:
+        with SessionLocal() as db:
+            write(db)
+            db.commit()
+    except Exception:  # noqa: BLE001 - persistence is best-effort
+        logger.exception("Failed to persist tool result")
+
+
 def record_user_details(email, name="Name not provided", notes="not provided") -> dict:
     pushover.push(f"Recording interest from {name} with email {email} and notes {notes}")
+    _persist(
+        lambda db: crud.add_lead(
+            db,
+            email=email,
+            name=name,
+            notes=notes,
+            conversation_id=get_conversation_id(),
+        )
+    )
     return {"recorded": "ok"}
 
 
 def record_unknown_question(question) -> dict:
     pushover.push(f"Recording unanswerable question: {question}")
+    _persist(
+        lambda db: crud.add_unknown_question(
+            db, question=question, conversation_id=get_conversation_id()
+        )
+    )
     return {"recorded": "ok"}
 
 

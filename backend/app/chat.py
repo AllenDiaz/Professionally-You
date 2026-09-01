@@ -12,6 +12,7 @@ non-streaming implementation (also used later by the evaluator).
 import logging
 
 from .config import get_settings
+from .context import conversation_scope
 from .prompt import build_system_prompt
 from .tools import TOOLS, handle_tool_calls
 from .vertex import vertex_client
@@ -19,8 +20,16 @@ from .vertex import vertex_client
 logger = logging.getLogger(__name__)
 
 
-def run_chat(message: str, history: list[dict] | None = None) -> str:
-    """Run a full chat turn (including tool calls) and return the reply text."""
+def run_chat(
+    message: str,
+    history: list[dict] | None = None,
+    conversation_id: int | None = None,
+) -> str:
+    """Run a full chat turn (including tool calls) and return the reply text.
+
+    ``conversation_id`` is exposed to tool handlers via a context var so any
+    lead / unknown-question they record is linked to this conversation.
+    """
     settings = get_settings()
     history = history or []
     messages: list = (
@@ -31,6 +40,11 @@ def run_chat(message: str, history: list[dict] | None = None) -> str:
 
     client = vertex_client()
 
+    with conversation_scope(conversation_id):
+        return _run_loop(client, settings, messages)
+
+
+def _run_loop(client, settings, messages: list) -> str:
     for _ in range(settings.max_tool_iterations):
         response = client.chat.completions.create(
             model=settings.model_name, messages=messages, tools=TOOLS
