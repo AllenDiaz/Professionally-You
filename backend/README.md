@@ -14,6 +14,17 @@ builder) into a structured, testable backend — and fixes the known bugs.
 - `app/chat.py` — **bounded** tool-calling loop (`MAX_TOOL_ITERATIONS`, default 6).
 - `app/routers/` — `GET /api/health`, `POST /api/chat`.
 
+## What Phase 2 adds (RAG + editable profile)
+
+- `app/sources.py` — cached loaders for `me/linkedin.pdf` and `me/summary.txt`.
+- `app/embeddings.py` — Vertex text embeddings (isolated for testing).
+- `app/rag.py` — chunk → embed → persist a JSON index; cosine top-k retrieval. **Replaces dumping the whole PDF into every prompt.**
+- `app/profile.py` — editable `data/profile.json`, seeded from `me/` on first load.
+- `app/prompt.py` — now builds from the profile summary/sections + query-relevant retrieved chunks.
+- Endpoints: `GET/PUT /api/profile`, `POST /api/profile/reindex`.
+
+After changing the profile or LinkedIn PDF, call `POST /api/profile/reindex` to rebuild the RAG index.
+
 ## Run
 
 ```bash
