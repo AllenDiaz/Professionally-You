@@ -38,6 +38,7 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
     volumes:
       - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
+      - ./me:/app/me:ro
     ports:
       - "8000:8000"
     depends_on:

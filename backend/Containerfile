@@ -14,7 +14,14 @@ RUN uv sync --frozen --no-dev --no-cache
 
 COPY app ./app
 
-ENV PATH="/app/.venv/bin:$PATH"
+# ME_DIR / DATA_DIR default to a path derived from config.py's own location,
+# which only resolves correctly in the local dev layout (backend/app/config.py
+# -> repo root). Pin them explicitly here instead; me/ is volume-mounted at
+# /app/me by podman-compose.yml (build context is ./backend, so it can't be
+# COPY'd from the repo-root me/ directory anyway).
+ENV PATH="/app/.venv/bin:$PATH" \
+    ME_DIR=/app/me \
+    DATA_DIR=/app/data
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

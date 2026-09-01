@@ -44,12 +44,19 @@ class Settings(BaseSettings):
     data_dir: Path = Field(
         default=_REPO_ROOT / "backend" / "data", validation_alias="DATA_DIR"
     )
+    # Native Vertex model ID (no "google/" publisher prefix — that's an
+    # OpenAI-compat-only convention; the native :predict endpoint just wants
+    # the bare model ID under /publishers/google/models/{id}:predict).
     embedding_model: str = Field(
         default="text-embedding-004", validation_alias="EMBEDDING_MODEL"
     )
     rag_top_k: int = Field(default=4, validation_alias="RAG_TOP_K")
     rag_chunk_size: int = Field(default=800, validation_alias="RAG_CHUNK_SIZE")
     rag_chunk_overlap: int = Field(default=150, validation_alias="RAG_CHUNK_OVERLAP")
+    # Build the RAG index automatically on startup if missing (calls the real
+    # embeddings API). Off by default in tests (see conftest.py) so importing
+    # the app never triggers a network call.
+    auto_build_rag_index: bool = Field(default=True, validation_alias="AUTO_BUILD_RAG_INDEX")
 
     # --- Database ---
     # SQLite by default for local/dev; set DATABASE_URL to a Postgres URL in prod,
