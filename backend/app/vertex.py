@@ -29,14 +29,20 @@ def _get_credentials():
     return _credentials
 
 
-def vertex_client() -> OpenAI:
-    """Return an OpenAI client pointed at the Vertex AI OpenAI-compatible endpoint.
+def get_access_token() -> str:
+    """Return a valid ADC access token, refreshing only when expired.
 
-    The access token is only refreshed when it is absent or expired, so warm
-    requests reuse a still-valid token instead of re-authenticating every call.
+    Shared by the OpenAI-compat chat client and the native embeddings REST
+    call in ``embeddings.py`` (Vertex's OpenAI-compat endpoint doesn't support
+    embedding models).
     """
-    settings = get_settings()
     creds = _get_credentials()
     if not creds.valid:
         creds.refresh(google.auth.transport.requests.Request())
-    return OpenAI(base_url=settings.vertex_base_url, api_key=creds.token)
+    return creds.token
+
+
+def vertex_client() -> OpenAI:
+    """Return an OpenAI client pointed at the Vertex AI OpenAI-compatible endpoint."""
+    settings = get_settings()
+    return OpenAI(base_url=settings.vertex_base_url, api_key=get_access_token())
