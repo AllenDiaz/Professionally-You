@@ -16,6 +16,8 @@ os.environ["ADMIN_TOKEN"] = "test-admin-token"
 # Generous default so the full suite hammering /api/chat* doesn't trip the
 # limiter; individual rate-limit tests lower this via monkeypatch.
 os.environ["CHAT_RATE_LIMIT"] = "10000/minute"
+# Never let importing the app trigger a real embeddings API call on startup.
+os.environ["AUTO_BUILD_RAG_INDEX"] = "false"
 
 import pytest  # noqa: E402
 

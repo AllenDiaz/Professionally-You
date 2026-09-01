@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from . import rag
 from .config import get_settings
 from .db import init_db
 from .rate_limit import limiter
@@ -21,6 +22,7 @@ logging.basicConfig(level=logging.INFO)
 def create_app() -> FastAPI:
     settings = get_settings()
     init_db()
+    rag.ensure_index()
 
     app = FastAPI(title="Professionally-You API", version="0.1.0")
     app.state.limiter = limiter

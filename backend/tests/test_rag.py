@@ -62,3 +62,61 @@ def test_build_index_persists_chunks(monkeypatch, tmp_path):
 
     assert count == 1  # short text -> single chunk
     assert index_file.exists()
+
+
+def test_ensure_index_skips_when_disabled(monkeypatch, tmp_path):
+    settings = rag.get_settings()
+    monkeypatch.setattr(settings, "auto_build_rag_index", False)
+    index_file = tmp_path / "rag_index.json"
+    monkeypatch.setattr(rag, "_index_path", lambda: index_file)
+
+    def _should_not_be_called():
+        raise AssertionError("build_index should not run when auto-build is disabled")
+
+    monkeypatch.setattr(rag, "build_index", _should_not_be_called)
+
+    rag.ensure_index()
+
+    assert not index_file.exists()
+
+
+def test_ensure_index_skips_when_already_built(monkeypatch, tmp_path):
+    settings = rag.get_settings()
+    monkeypatch.setattr(settings, "auto_build_rag_index", True)
+    index_file = tmp_path / "rag_index.json"
+    index_file.write_text("{}")
+    monkeypatch.setattr(rag, "_index_path", lambda: index_file)
+
+    def _should_not_be_called():
+        raise AssertionError("build_index should not re-run when the index already exists")
+
+    monkeypatch.setattr(rag, "build_index", _should_not_be_called)
+
+    rag.ensure_index()
+
+
+def test_ensure_index_builds_when_missing_and_enabled(monkeypatch, tmp_path):
+    settings = rag.get_settings()
+    monkeypatch.setattr(settings, "auto_build_rag_index", True)
+    index_file = tmp_path / "rag_index.json"
+    monkeypatch.setattr(rag, "_index_path", lambda: index_file)
+    calls = []
+    monkeypatch.setattr(rag, "build_index", lambda: calls.append(1) or 3)
+
+    rag.ensure_index()
+
+    assert calls == [1]
+
+
+def test_ensure_index_failure_does_not_raise(monkeypatch, tmp_path):
+    settings = rag.get_settings()
+    monkeypatch.setattr(settings, "auto_build_rag_index", True)
+    index_file = tmp_path / "rag_index.json"
+    monkeypatch.setattr(rag, "_index_path", lambda: index_file)
+
+    def _boom():
+        raise RuntimeError("vertex unavailable")
+
+    monkeypatch.setattr(rag, "build_index", _boom)
+
+    rag.ensure_index()  # must not raise — startup shouldn't crash on this

@@ -10,12 +10,15 @@ vector database required for Phase 2. (Phase 3 can move this into Postgres/pgvec
 """
 
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
 
 from . import embeddings, sources
 from .config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
@@ -68,6 +71,28 @@ def build_index() -> int:
     vectors = embeddings.embed_texts(chunks)
     _save_index(chunks, vectors)
     return len(chunks)
+
+
+def ensure_index() -> None:
+    """Build the RAG index on first boot if it doesn't exist yet.
+
+    Without this, a freshly deployed container has zero LinkedIn grounding
+    until someone remembers to call POST /api/profile/reindex — the model
+    just fills the gap with a plausible-sounding but fabricated career.
+    """
+    settings = get_settings()
+    if not settings.auto_build_rag_index:
+        return
+    if _index_path().exists():
+        return
+    try:
+        count = build_index()
+        logger.info("Built initial RAG index: %d chunk(s)", count)
+    except Exception:
+        logger.exception(
+            "Initial RAG index build failed; chat will run without LinkedIn grounding "
+            "until POST /api/profile/reindex succeeds"
+        )
 
 
 def retrieve(query: str, k: int | None = None) -> list[str]:
