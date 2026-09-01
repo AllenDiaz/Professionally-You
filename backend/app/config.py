@@ -39,6 +39,18 @@ class Settings(BaseSettings):
     person_name: str = Field(default="Allen Diaz", validation_alias="PERSON_NAME")
     me_dir: Path = Field(default=_REPO_ROOT / "me", validation_alias="ME_DIR")
 
+    # --- RAG / profile ---
+    # Where the editable profile.json and the RAG index are persisted.
+    data_dir: Path = Field(
+        default=_REPO_ROOT / "backend" / "data", validation_alias="DATA_DIR"
+    )
+    embedding_model: str = Field(
+        default="text-embedding-004", validation_alias="EMBEDDING_MODEL"
+    )
+    rag_top_k: int = Field(default=4, validation_alias="RAG_TOP_K")
+    rag_chunk_size: int = Field(default=800, validation_alias="RAG_CHUNK_SIZE")
+    rag_chunk_overlap: int = Field(default=150, validation_alias="RAG_CHUNK_OVERLAP")
+
     # --- Pushover ---
     pushover_user: str | None = Field(default=None, validation_alias="PUSHOVER_USER")
     pushover_token: str | None = Field(default=None, validation_alias="PUSHOVER_TOKEN")
