@@ -40,7 +40,7 @@ def _tool(name, args, call_id="call_1"):
 
 def _patch_common(monkeypatch, fake):
     monkeypatch.setattr(chat_module, "vertex_client", lambda: fake)
-    monkeypatch.setattr(chat_module, "build_system_prompt", lambda: "SYS")
+    monkeypatch.setattr(chat_module, "build_system_prompt", lambda *args, **kwargs: "SYS")
 
 
 def test_returns_plain_text(monkeypatch):
