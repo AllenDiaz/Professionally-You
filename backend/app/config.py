@@ -71,6 +71,16 @@ class Settings(BaseSettings):
     # Hard cap on the tool-calling loop so a misbehaving model can't loop forever.
     max_tool_iterations: int = Field(default=6, validation_alias="MAX_TOOL_ITERATIONS")
 
+    # --- Guardrails / evaluator ---
+    # Both fail open (never block a reply) if the check itself errors. Off switches
+    # are provided since each adds an extra LLM round-trip's worth of latency/cost.
+    enable_guardrails: bool = Field(default=True, validation_alias="ENABLE_GUARDRAILS")
+    enable_evaluator: bool = Field(default=True, validation_alias="ENABLE_EVALUATOR")
+
+    # --- Rate limiting ---
+    # slowapi limit string, e.g. "20/minute". Applied per client IP to /api/chat*.
+    chat_rate_limit: str = Field(default="20/minute", validation_alias="CHAT_RATE_LIMIT")
+
     # --- CORS ---
     allowed_origins: str = Field(
         default="http://localhost:3000", validation_alias="ALLOWED_ORIGINS"
