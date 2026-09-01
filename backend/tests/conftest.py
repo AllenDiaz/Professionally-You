@@ -13,6 +13,9 @@ _TMP = Path(tempfile.mkdtemp(prefix="proyou-test-"))
 os.environ["DATA_DIR"] = str(_TMP)
 os.environ["DATABASE_URL"] = f"sqlite:///{_TMP / 'test.db'}"
 os.environ["ADMIN_TOKEN"] = "test-admin-token"
+# Generous default so the full suite hammering /api/chat* doesn't trip the
+# limiter; individual rate-limit tests lower this via monkeypatch.
+os.environ["CHAT_RATE_LIMIT"] = "10000/minute"
 
 import pytest  # noqa: E402
 

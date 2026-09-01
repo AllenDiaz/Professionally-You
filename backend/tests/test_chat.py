@@ -41,6 +41,8 @@ def _tool(name, args, call_id="call_1"):
 def _patch_common(monkeypatch, fake):
     monkeypatch.setattr(chat_module, "vertex_client", lambda: fake)
     monkeypatch.setattr(chat_module, "build_system_prompt", lambda *args, **kwargs: "SYS")
+    monkeypatch.setattr(chat_module.guardrails, "check_input", lambda msg: (True, ""))
+    monkeypatch.setattr(chat_module.guardrails, "evaluate_reply", lambda *a, **k: (True, ""))
 
 
 def test_returns_plain_text(monkeypatch):
@@ -91,3 +93,37 @@ def test_tool_loop_is_bounded(monkeypatch):
     assert len(fake.chat.completions.calls) == cap + 1
     # The final call must not offer tools.
     assert "tools" not in fake.chat.completions.calls[-1]
+
+
+def test_input_guardrail_blocks_before_any_model_call(monkeypatch):
+    fake = _FakeClient([])
+    monkeypatch.setattr(chat_module, "vertex_client", lambda: fake)
+    monkeypatch.setattr(chat_module, "build_system_prompt", lambda *a, **k: "SYS")
+    monkeypatch.setattr(chat_module.guardrails, "check_input", lambda msg: (False, "abusive"))
+
+    reply = chat_module.run_chat("bad message")
+
+    assert reply == chat_module.guardrails.GUARDRAIL_REDIRECT_MESSAGE
+    assert fake.chat.completions.calls == []
+
+
+def test_evaluator_rejection_triggers_one_retry(monkeypatch):
+    fake = _FakeClient([_text("first draft"), _text("second draft")])
+    _patch_common(monkeypatch, fake)
+
+    calls = {"n": 0}
+
+    def _evaluate(name, system_prompt, user_message, draft_reply):
+        calls["n"] += 1
+        return (calls["n"] > 1, "needs fix")
+
+    monkeypatch.setattr(chat_module.guardrails, "evaluate_reply", _evaluate)
+
+    reply = chat_module.run_chat("question")
+
+    assert reply == "second draft"
+    assert len(fake.chat.completions.calls) == 2
+    retry_messages = fake.chat.completions.calls[1]["messages"]
+    assert any(
+        isinstance(m, dict) and "needs fix" in m.get("content", "") for m in retry_messages
+    )
