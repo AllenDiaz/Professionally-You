@@ -24,7 +24,7 @@ def run_chat(message: str, history: list[dict] | None = None) -> str:
     settings = get_settings()
     history = history or []
     messages: list = (
-        [{"role": "system", "content": build_system_prompt()}]
+        [{"role": "system", "content": build_system_prompt(message)}]
         + list(history)
         + [{"role": "user", "content": message}]
     )

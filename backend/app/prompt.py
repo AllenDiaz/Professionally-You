@@ -1,43 +1,19 @@
 """System-prompt construction.
 
-Ports ``Me.system_prompt()`` from the original ``app.py``. For Phase 1 the full
-LinkedIn PDF text and summary are loaded once (cached) and embedded verbatim.
-Phase 2 will replace the ``## LinkedIn Profile`` section with top-k RAG retrieval.
+Phase 2: the prompt is now built from the editable profile (summary + sections)
+plus **query-aware RAG retrieval** — only the top-k LinkedIn chunks relevant to
+the current user message are included, instead of the entire PDF every turn.
 """
 
-from functools import lru_cache
-
-from pypdf import PdfReader
-
+from . import rag
 from .config import get_settings
+from .profile import load_profile
 
 
-@lru_cache
-def _load_context() -> tuple[str, str]:
-    """Load (summary, linkedin) text from the ``me/`` directory, cached."""
+def build_system_prompt(user_message: str | None = None) -> str:
     settings = get_settings()
-
-    linkedin = ""
-    pdf_path = settings.me_dir / "linkedin.pdf"
-    if pdf_path.exists():
-        reader = PdfReader(str(pdf_path))
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                linkedin += text
-
-    summary = ""
-    summary_path = settings.me_dir / "summary.txt"
-    if summary_path.exists():
-        summary = summary_path.read_text(encoding="utf-8")
-
-    return summary, linkedin
-
-
-def build_system_prompt() -> str:
-    settings = get_settings()
-    name = settings.person_name
-    summary, linkedin = _load_context()
+    profile = load_profile()
+    name = profile.name or settings.person_name
 
     prompt = (
         f"You are acting as {name}. You are answering questions on {name}'s website, "
@@ -50,6 +26,20 @@ def build_system_prompt() -> str:
         f"If the user is engaging in discussion, try to steer them towards getting in touch via email; "
         f"ask for their email and record it using your record_user_details tool. "
     )
-    prompt += f"\n\n## Summary:\n{summary}\n\n## LinkedIn Profile:\n{linkedin}\n\n"
-    prompt += f"With this context, please chat with the user, always staying in character as {name}."
+
+    prompt += f"\n\n## Summary:\n{profile.summary}\n"
+    for section in profile.sections:
+        prompt += f"\n## {section.title}:\n{section.content}\n"
+
+    # Query-aware retrieval — replaces dumping the whole LinkedIn PDF every turn.
+    if user_message:
+        snippets = rag.retrieve(user_message)
+        if snippets:
+            joined = "\n\n---\n\n".join(snippets)
+            prompt += f"\n\n## Relevant background (retrieved):\n{joined}\n"
+
+    prompt += (
+        f"\n\nWith this context, please chat with the user, "
+        f"always staying in character as {name}."
+    )
     return prompt
