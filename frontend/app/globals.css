@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/*
+  Design system: "a REPL you talk to."
+  Light-mode-primary, cool-neutral paper (not cream), deep teal accent (not
+  neon), Space Mono for chrome/labels, Newsreader serif for reading. Dark mode
+  flips the surface, keeps the same accent hues at slightly higher contrast.
+*/
+:root {
+  --paper: #f1f2ed;
+  --panel: #fbfbf9;
+  --ink: #14181c;
+  --ink-muted: #5b6167;
+  --rule: #d8dad2;
+  --phosphor: #0e7c6b;
+  --phosphor-soft: rgba(14, 124, 107, 0.1);
+  --signal: #d6572b;
+}
+
+[data-theme="dark"] {
+  --paper: #12151a;
+  --panel: #191d23;
+  --ink: #edeee9;
+  --ink-muted: #8b9199;
+  --rule: #2a2f37;
+  --phosphor: #3fd6bd;
+  --phosphor-soft: rgba(63, 214, 189, 0.12);
+  --signal: #ef7c4e;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-rule: var(--rule);
+  --color-phosphor: var(--phosphor);
+  --color-phosphor-soft: var(--phosphor-soft);
+  --color-signal: var(--signal);
+
+  --font-mono: var(--font-space-mono);
+  --font-serif: var(--font-newsreader);
+}
+
+html {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+* {
+  border-color: var(--rule);
+}
+
+::selection {
+  background: var(--phosphor-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--phosphor);
+  outline-offset: 2px;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.caret {
+  animation: caret-blink 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
