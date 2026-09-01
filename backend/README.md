@@ -25,6 +25,20 @@ builder) into a structured, testable backend — and fixes the known bugs.
 
 After changing the profile or LinkedIn PDF, call `POST /api/profile/reindex` to rebuild the RAG index.
 
+## What Phase 3 adds (persistence + admin API)
+
+- `app/models.py` + `app/db.py` — SQLAlchemy models and engine. **SQLite by default**; set `DATABASE_URL` to a Postgres URL in prod.
+- `app/crud.py` — data-access helpers.
+- `app/context.py` — carries the active conversation id to tool handlers.
+- Tools now **persist** to the DB (leads, unknown questions) in addition to Pushover.
+- `POST /api/chat` now persists the conversation + both messages and returns a `conversation_id` (pass it back to continue a conversation).
+- `app/routers/admin.py` — bearer-token-guarded (`ADMIN_TOKEN`):
+  - `GET /api/admin/leads`
+  - `GET /api/admin/unknown-questions`
+  - `GET /api/admin/conversations` and `/api/admin/conversations/{id}`
+
+Additional env vars: `DATABASE_URL` (default local SQLite at `backend/data/app.db`), `ADMIN_TOKEN` (required to use the admin API; unset → 503).
+
 ## Run
 
 ```bash
