@@ -37,12 +37,35 @@ def test_save_and_reload_roundtrip(monkeypatch, tmp_path):
     assert reloaded == original
 
 
+AUTH = {"Authorization": "Bearer test-admin-token"}
+
+
+def test_reindex_requires_admin_token():
+    assert client.post("/api/profile/reindex").status_code == 401
+
+
 def test_reindex_endpoint(monkeypatch):
     monkeypatch.setattr("app.routers.profile.rag.build_index", lambda: 7)
-    response = client.post("/api/profile/reindex")
+    response = client.post("/api/profile/reindex", headers=AUTH)
 
     assert response.status_code == 200
     assert response.json() == {"chunks": 7}
+
+
+def test_update_profile_requires_admin_token():
+    body = {"name": "X", "headline": "", "summary": "", "sections": []}
+    assert client.put("/api/profile", json=body).status_code == 401
+
+
+def test_update_profile_endpoint(monkeypatch, tmp_path):
+    path = tmp_path / "profile.json"
+    monkeypatch.setattr(profile_module, "_profile_path", lambda: path)
+
+    body = {"name": "Updated Name", "headline": "H", "summary": "S", "sections": []}
+    response = client.put("/api/profile", json=body, headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Updated Name"
 
 
 def test_get_profile_endpoint(monkeypatch, tmp_path):
