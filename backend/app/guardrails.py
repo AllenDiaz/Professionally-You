@@ -9,11 +9,33 @@ check itself errors, so a judge outage can't take the chatbot down.
 
 import json
 import logging
+import re
 
 from .config import get_settings
 from .vertex import vertex_client
 
 logger = logging.getLogger(__name__)
+
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+
+
+def _parse_json_object(text: str | None) -> dict:
+    """Parse a judge's JSON reply, tolerating markdown code fences.
+
+    Models asked for "ONLY compact JSON" still sometimes wrap it in a
+    ```json ... ``` fence; strip that before parsing, and fall back to the
+    outermost {...} substring if the whole string still won't parse.
+    """
+    if not text:
+        return {}
+    cleaned = _JSON_FENCE_RE.sub("", text.strip()).strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        start, end = cleaned.find("{"), cleaned.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return json.loads(cleaned[start : end + 1])
+        raise
 
 GUARDRAIL_REDIRECT_MESSAGE = (
     "I'm not able to help with that request. Feel free to ask me about my "
@@ -44,7 +66,7 @@ def check_input(message: str) -> tuple[bool, str]:
             ],
             temperature=0,
         )
-        payload = json.loads(response.choices[0].message.content or "{}")
+        payload = _parse_json_object(response.choices[0].message.content)
         return bool(payload.get("allowed", True)), str(payload.get("reason", ""))
     except Exception:
         logger.exception("Input guardrail check failed; failing open")
@@ -85,7 +107,7 @@ def evaluate_reply(
             ],
             temperature=0,
         )
-        payload = json.loads(response.choices[0].message.content or "{}")
+        payload = _parse_json_object(response.choices[0].message.content)
         return bool(payload.get("acceptable", True)), str(payload.get("feedback", ""))
     except Exception:
         logger.exception("Output evaluator check failed; failing open")

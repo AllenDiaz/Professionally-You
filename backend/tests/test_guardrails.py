@@ -24,6 +24,27 @@ class _FakeClient:
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
 
+def test_check_input_handles_markdown_fenced_json(monkeypatch):
+    fenced = "```json\n" + json.dumps({"allowed": False, "reason": "off-topic"}) + "\n```"
+    monkeypatch.setattr(guardrails, "vertex_client", lambda: _FakeClient(fenced))
+
+    allowed, reason = guardrails.check_input("...")
+
+    assert allowed is False
+    assert reason == "off-topic"
+
+
+def test_parse_json_object_extracts_from_surrounding_prose():
+    text = 'Sure, here you go: {"allowed": true, "reason": "fine"} — hope that helps!'
+
+    assert guardrails._parse_json_object(text) == {"allowed": True, "reason": "fine"}
+
+
+def test_parse_json_object_empty_text_returns_empty_dict():
+    assert guardrails._parse_json_object(None) == {}
+    assert guardrails._parse_json_object("") == {}
+
+
 def test_check_input_allows(monkeypatch):
     monkeypatch.setattr(
         guardrails, "vertex_client", lambda: _FakeClient(json.dumps({"allowed": True, "reason": ""}))
