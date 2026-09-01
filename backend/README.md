@@ -39,6 +39,18 @@ After changing the profile or LinkedIn PDF, call `POST /api/profile/reindex` to 
 
 Additional env vars: `DATABASE_URL` (default local SQLite at `backend/data/app.db`), `ADMIN_TOKEN` (required to use the admin API; unset → 503).
 
+## What Phase 4 adds (streaming + guardrails/evaluator + rate limiting)
+
+- `app/stream.py` — streaming counterpart to `chat.py`; accumulates tool-call fragments across chunks, executes them, and resumes streaming. Same bounded tool loop as the non-streaming path.
+- `app/guardrails.py` — the "Evaluator" pattern the notebook always suggested but never built:
+  - **Input guardrail**: judges each user message before the model runs; blocks abusive/off-topic input with a redirect message.
+  - **Output evaluator**: judges the drafted reply for on-persona/accuracy; on rejection, retries **once** with the evaluator's feedback appended.
+  - Both **fail open** (never block a reply) if the judge call itself errors, and can be disabled via `ENABLE_GUARDRAILS` / `ENABLE_EVALUATOR`.
+- `app/rate_limit.py` — shared `slowapi` limiter, applied per client IP to both chat endpoints via `CHAT_RATE_LIMIT` (default `20/minute`).
+- `POST /api/chat/stream` — **new** SSE endpoint. Emits `data: {"delta": "..."}` events, then `data: {"done": true, "conversation_id": ...}`. Persists the conversation the same way as `/api/chat`. **Guardrail runs, evaluator does not** (evaluating the full reply before sending would defeat streaming) — use `/api/chat` when the evaluator matters more than latency.
+
+Additional env vars: `ENABLE_GUARDRAILS` (default `true`), `ENABLE_EVALUATOR` (default `true`), `CHAT_RATE_LIMIT` (default `20/minute`, [slowapi format](https://github.com/laurentS/slowapi)).
+
 ## Run
 
 ```bash
