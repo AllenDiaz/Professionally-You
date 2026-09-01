@@ -10,6 +10,7 @@ When committing work in this repo:
 - Make **granular commits**: group related files into small, logically-scoped commits rather than one large commit. Each commit does one thing.
 - Use **conventional commit messages** (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `build:`, `chore:`).
 - Run the full sequence: `git add` → `git commit` (one per logical change) → `git push`.
+- **Commit and push directly to `main`** (no feature branch).
 - **Do NOT add a `Co-Authored-By: Claude` trailer** (or any Claude/Anthropic co-author line) to commits.
 
 ## Project Overview
