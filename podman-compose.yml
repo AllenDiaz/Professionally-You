@@ -1,0 +1,65 @@
+# Local/self-hosted stack: web (Next.js) + api (FastAPI) + db (Postgres).
+#
+# Run:   podman-compose up --build
+# Stop:  podman-compose down
+#
+# NEXT_PUBLIC_API_BASE_URL is inlined into the browser bundle at build time and
+# is read by the BROWSER on your host, not by containers — it must be a
+# host-reachable URL (default http://localhost:8000), not the internal
+# service name `api`.
+#
+# GCP auth: mounts your local Application Default Credentials read-only into
+# the api container so `google.auth.default()` finds them at the well-known
+# path. Run `gcloud auth application-default login` on the host first.
+
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: proyou
+      POSTGRES_PASSWORD: proyou
+      POSTGRES_DB: proyou
+    volumes:
+      - proyou-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U proyou"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://proyou:proyou@db:5432/proyou
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  proyou-db-data:
