@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Workflow
+
+**Professional, granular GitHub sequence from add to push — without a Claude co-author.**
+
+When committing work in this repo:
+- Make **granular commits**: group related files into small, logically-scoped commits rather than one large commit. Each commit does one thing.
+- Use **conventional commit messages** (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `build:`, `chore:`).
+- Run the full sequence: `git add` → `git commit` (one per logical change) → `git push`.
+- **Do NOT add a `Co-Authored-By: Claude` trailer** (or any Claude/Anthropic co-author line) to commits.
+
 ## Project Overview
 
 **Professionally-You** is a Jupyter notebook application that creates an AI-powered career chatbot — a "digital twin" that answers questions about a person's professional background. It reads personal context from a LinkedIn PDF and summary text file, then uses Google Gemini via Vertex AI to power an interactive Gradio web chat interface.
@@ -10,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. Install dependencies:
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
 2. Configure `.env` (see Environment Variables below)
@@ -21,7 +31,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 4. Open and run `main.ipynb` in Jupyter:
    ```bash
-   jupyter notebook main.ipynb
+   uv run jupyter notebook main.ipynb
    ```
    The Gradio UI will launch locally once all cells are executed.
 
@@ -29,9 +39,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Required variables:
 - `GOOGLE_APPLICATION_CREDENTIALS` or GCP credential config — for Vertex AI authentication
-- `GCLOUD_PROJECT` — Google Cloud project ID
-- `GCLOUD_REGION` — GCP region (default: `us-central1`)
-- `MODEL_NAME` — Gemini model to use (e.g., `gemini-2.5-pro`)
+- `GCP_PROJECT` — Google Cloud project ID
+- `GCP_LOCATION` — GCP region (default: `us-central1`)
+- `MODEL_NAME` — Gemini model to use (e.g., `google/gemini-2.5-pro`)
 - `PUSHOVER_USER` — Pushover user key for push notifications
 - `PUSHOVER_TOKEN` — Pushover app token
 
