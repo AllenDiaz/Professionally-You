@@ -1,5 +1,8 @@
 from dotenv import load_dotenv
 from openai import OpenAI
+import certifi
+import google.auth
+import google.auth.transport.requests
 import json
 import os
 import requests
@@ -9,6 +12,26 @@ import gradio as gr
 
 load_dotenv(override=True)
 
+PROJECT_ID = os.getenv("GCP_PROJECT")
+LOCATION = os.getenv("GCP_LOCATION", "us-central1")
+MODEL_NAME = os.getenv("MODEL_NAME", "google/gemini-2.5-pro")
+
+_credentials, _ = google.auth.default()
+
+
+def vertex_client():
+    """Refresh the ADC token and return an OpenAI client pointed at the Vertex AI
+    OpenAI-compatible endpoint. Called per-request since access tokens expire."""
+    _credentials.refresh(google.auth.transport.requests.Request())
+    return OpenAI(
+        base_url=(
+            f"https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}"
+            f"/locations/{LOCATION}/endpoints/openapi"
+        ),
+        api_key=_credentials.token,
+    )
+
+
 def push(text):
     requests.post(
         "https://api.pushover.net/1/messages.json",
@@ -16,7 +39,8 @@ def push(text):
             "token": os.getenv("PUSHOVER_TOKEN"),
             "user": os.getenv("PUSHOVER_USER"),
             "message": text,
-        }
+        },
+        verify=certifi.where(),
     )
 
 
@@ -76,8 +100,7 @@ tools = [{"type": "function", "function": record_user_details_json},
 class Me:
 
     def __init__(self):
-        self.openai = OpenAI()
-        self.name = "Ed Donner"
+        self.name = "Allen Diaz"
         reader = PdfReader("me/linkedin.pdf")
         self.linkedin = ""
         for page in reader.pages:
@@ -114,9 +137,10 @@ If the user is engaging in discussion, try to steer them towards getting in touc
     
     def chat(self, message, history):
         messages = [{"role": "system", "content": self.system_prompt()}] + history + [{"role": "user", "content": message}]
+        client = vertex_client()
         done = False
         while not done:
-            response = self.openai.chat.completions.create(model="gpt-4o-mini", messages=messages, tools=tools)
+            response = client.chat.completions.create(model=MODEL_NAME, messages=messages, tools=tools)
             if response.choices[0].finish_reason=="tool_calls":
                 message = response.choices[0].message
                 tool_calls = message.tool_calls
@@ -130,5 +154,5 @@ If the user is engaging in discussion, try to steer them towards getting in touc
 
 if __name__ == "__main__":
     me = Me()
-    gr.ChatInterface(me.chat, type="messages").launch()
+    gr.ChatInterface(me.chat).launch()
     

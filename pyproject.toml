@@ -1,0 +1,21 @@
+[project]
+name = "professionally-you"
+version = "0.1.0"
+description = "AI-powered career chatbot digital twin"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "certifi>=2025.4.26",
+    "google-auth>=2.35.0",
+    "google-cloud-aiplatform>=1.106.0",
+    "gradio>=5.33.1",
+    "openai>=1.85.0",
+    "pypdf>=5.6.0",
+    "python-dotenv>=1.1.0",
+    "requests>=2.32.4",
+]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+]
