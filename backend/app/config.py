@@ -51,6 +51,18 @@ class Settings(BaseSettings):
     rag_chunk_size: int = Field(default=800, validation_alias="RAG_CHUNK_SIZE")
     rag_chunk_overlap: int = Field(default=150, validation_alias="RAG_CHUNK_OVERLAP")
 
+    # --- Database ---
+    # SQLite by default for local/dev; set DATABASE_URL to a Postgres URL in prod,
+    # e.g. postgresql+psycopg://user:pass@host:5432/dbname
+    database_url: str = Field(
+        default=f"sqlite:///{_REPO_ROOT / 'backend' / 'data' / 'app.db'}",
+        validation_alias="DATABASE_URL",
+    )
+
+    # --- Admin API ---
+    # Bearer token that guards /api/admin/*. If unset, the admin API returns 503.
+    admin_token: str | None = Field(default=None, validation_alias="ADMIN_TOKEN")
+
     # --- Pushover ---
     pushover_user: str | None = Field(default=None, validation_alias="PUSHOVER_USER")
     pushover_token: str | None = Field(default=None, validation_alias="PUSHOVER_TOKEN")
