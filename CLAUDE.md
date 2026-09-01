@@ -15,71 +15,43 @@ When committing work in this repo:
 
 ## Project Overview
 
-**Professionally-You** is a Jupyter notebook application that creates an AI-powered career chatbot — a "digital twin" that answers questions about a person's professional background. It reads personal context from a LinkedIn PDF and summary text file, then uses Google Gemini via Vertex AI to power an interactive Gradio web chat interface.
-
-## Running the Application
-
-1. Install dependencies:
-   ```bash
-   uv sync
-   ```
-
-2. Configure `.env` (see Environment Variables below)
-
-3. Place personal context files:
-   - `me/linkedin.pdf` — exported LinkedIn profile PDF
-   - `me/summary.txt` — career summary / talking points
-
-4. Open and run `main.ipynb` in Jupyter:
-   ```bash
-   uv run jupyter notebook main.ipynb
-   ```
-   The Gradio UI will launch locally once all cells are executed.
-
-## Environment Variables (.env)
-
-Required variables:
-- `GOOGLE_APPLICATION_CREDENTIALS` or GCP credential config — for Vertex AI authentication
-- `GCP_PROJECT` — Google Cloud project ID
-- `GCP_LOCATION` — GCP region (default: `us-central1`)
-- `MODEL_NAME` — Gemini model to use (e.g., `google/gemini-2.5-pro`)
-- `PUSHOVER_USER` — Pushover user key for push notifications
-- `PUSHOVER_TOKEN` — Pushover app token
+**Professionally-You** is an AI-powered career chatbot — a "digital twin" that answers questions about a person's professional background. It was originally a single Gradio/notebook app (`main.ipynb`, `app.py` — kept as a historical reference, no longer the entrypoint); it has since been rebuilt as a **FastAPI backend + Next.js frontend**, containerized with **Podman**.
 
 ## Architecture
 
-The notebook follows a linear setup flow:
+```
+Next.js (frontend/, port 3000)  ──HTTP/SSE──▶  FastAPI (backend/, port 8000)
+  chat UI + admin dashboard                       ├─ Vertex AI (ADC, cached token) ── Gemini
+                                                   ├─ RAG retrieval (embeddings, JSON index)
+                                                   ├─ guardrail + evaluator (LLM-as-judge)
+                                                   ├─ tools → Pushover
+                                                   └─ Postgres/SQLite (conversations, leads, unknown Qs)
+```
 
-1. **Auth** — Authenticates to Google Cloud via `google.auth` and creates an OpenAI-compatible client pointed at Vertex AI (`openai.OpenAI` with a Vertex AI base URL).
+- **`backend/`** — see `backend/README.md`. FastAPI app (`app/main.py`), Vertex AI auth with cached ADC token (`app/vertex.py`), a bounded tool-calling loop (`app/chat.py`, `app/stream.py` for SSE), RAG-based system prompt (`app/rag.py`, `app/prompt.py`) instead of dumping the whole LinkedIn PDF every turn, an editable profile store (`app/profile.py`), SQLAlchemy persistence (`app/models.py`, `app/db.py`), an admin API guarded by a bearer token (`app/auth.py`, `app/routers/admin.py`), input guardrail + output evaluator (`app/guardrails.py`), and per-IP rate limiting (`app/rate_limit.py`).
+- **`frontend/`** — see `frontend/README.md`. Next.js (App Router, TypeScript, Tailwind v4) chat UI that streams `/api/chat/stream`, plus a token-gated admin dashboard under `/admin`.
+- **`podman-compose.yml`** — runs `web` + `api` + `db` (Postgres) together. `backend/Containerfile` and `frontend/Containerfile` build each image; run `podman-compose up --build` from the repo root.
+- **`me/`** — source-of-record LinkedIn PDF + summary, read by the backend's RAG ingest.
 
-2. **Tool definitions** — Two tools for the LLM:
-   - `record_user_details(email, name, notes)` — captures interested contacts via Pushover notification
-   - `record_unknown_question(question)` — logs unanswerable questions via Pushover notification
-   - Tool dispatch uses `globals()[tool_name](**arguments)` instead of a large if/else chain.
+## Running the Application
 
-3. **Context loading** — Reads `me/linkedin.pdf` (via `pypdf`) and `me/summary.txt` to build the system prompt that positions the AI as a specific person.
+**New stack (recommended):**
+```bash
+podman-compose up --build
+```
+Or run each half locally — see `backend/README.md` and `frontend/README.md` for `uv sync` / `npm install` + dev-server instructions.
 
-4. **Chat loop** — A `chat(message, history)` function handles multi-turn conversation with tool call handling: continues looping until no more tool calls remain in the response.
+**Legacy notebook (still present, not the primary path):**
+```bash
+uv sync
+uv run jupyter notebook main.ipynb
+```
+The Gradio UI launches locally once all cells are executed.
 
-5. **Gradio UI** — `gr.ChatInterface` wraps the chat function for a web UI.
+## Environment Variables
 
-## Deployment (HuggingFace Spaces)
+See `.env.example` at the repo root for the full, correctly-named list (backend reads `GCP_LOCATION`, accepting the legacy `GOOGLE_LOCATION` name too). Backend-specific vars (`DATABASE_URL`, `ADMIN_TOKEN`, `ENABLE_GUARDRAILS`, etc.) are documented in `backend/README.md`; the frontend's `NEXT_PUBLIC_API_BASE_URL` is documented in `frontend/README.md`.
 
-Target: HuggingFace Space named `career_conversation`
+## Deployment
 
-Steps:
-1. Set secrets in HF Space settings (all `.env` variables)
-2. Upload `main.ipynb`, `requirements.txt`, `me/linkedin.pdf`, `me/summary.txt`
-3. The Space runs the notebook on startup
-
-To update: re-upload changed files or push via the HF API.
-
-## Dependencies
-
-Dependencies are pinned in `requirements.txt` (generated by `uv pip compile`). Key runtime libraries:
-- `openai` — OpenAI-compatible client for Vertex AI
-- `gradio` — Chat web interface
-- `google-auth`, `google-cloud-aiplatform` — GCP authentication and Vertex AI
-- `pypdf` — LinkedIn PDF extraction
-- `requests` — Pushover HTTP API calls
-- `python-dotenv` — `.env` loading
+The new stack is provider-agnostic via containers (`podman-compose.yml`); see `backend/Containerfile` / `frontend/Containerfile`. The legacy notebook's HuggingFace Spaces deployment path (`uv run gradio deploy`, Space `career_conversation`) still works if you need it, but is no longer the primary deployment target.
