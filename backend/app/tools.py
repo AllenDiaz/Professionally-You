@@ -1,16 +1,20 @@
 """LLM tool definitions and dispatch.
 
-Ports the two tools from the original ``app.py``. The key change: tool dispatch
-now goes through an explicit ``TOOL_HANDLERS`` mapping instead of the original
-``globals().get(tool_name)`` lookup, which could invoke any global by name with
-model-controlled arguments.
+Ports the two tools from the original ``app.py``. Two key changes:
+1. Tool dispatch goes through an explicit ``TOOL_HANDLERS`` mapping instead of
+   the original ``globals().get(tool_name)`` lookup, which could invoke any
+   global by name with model-controlled arguments.
+2. ``conversation_id`` is passed explicitly through the call chain rather than
+   via a contextvar — a contextvar's set()/reset() pair must run in the same
+   ``contextvars.Context``, which broke for the streaming path: Starlette
+   iterates a sync generator's ``next()`` calls via a threadpool, and separate
+   calls aren't guaranteed to share a Context.
 """
 
 import json
 import logging
 
 from . import crud, pushover
-from .context import get_conversation_id
 from .db import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -26,7 +30,9 @@ def _persist(write) -> None:
         logger.exception("Failed to persist tool result")
 
 
-def record_user_details(email, name="Name not provided", notes="not provided") -> dict:
+def record_user_details(
+    email, name="Name not provided", notes="not provided", conversation_id=None
+) -> dict:
     pushover.push(f"Recording interest from {name} with email {email} and notes {notes}")
     _persist(
         lambda db: crud.add_lead(
@@ -34,17 +40,17 @@ def record_user_details(email, name="Name not provided", notes="not provided") -
             email=email,
             name=name,
             notes=notes,
-            conversation_id=get_conversation_id(),
+            conversation_id=conversation_id,
         )
     )
     return {"recorded": "ok"}
 
 
-def record_unknown_question(question) -> dict:
+def record_unknown_question(question, conversation_id=None) -> dict:
     pushover.push(f"Recording unanswerable question: {question}")
     _persist(
         lambda db: crud.add_unknown_question(
-            db, question=question, conversation_id=get_conversation_id()
+            db, question=question, conversation_id=conversation_id
         )
     )
     return {"recorded": "ok"}
@@ -96,7 +102,7 @@ TOOLS = [
 ]
 
 
-def handle_tool_calls(tool_calls) -> list[dict]:
+def handle_tool_calls(tool_calls, conversation_id=None) -> list[dict]:
     """Execute tool calls via the explicit dispatch table and return tool messages."""
     results = []
     for tool_call in tool_calls:
@@ -108,7 +114,7 @@ def handle_tool_calls(tool_calls) -> list[dict]:
             logger.warning("Unknown tool requested by model: %s", tool_name)
             result = {"error": f"unknown tool: {tool_name}"}
         else:
-            result = handler(**arguments)
+            result = handler(conversation_id=conversation_id, **arguments)
         results.append(
             {
                 "role": "tool",

@@ -18,7 +18,6 @@ from types import SimpleNamespace
 
 from . import guardrails
 from .config import get_settings
-from .context import conversation_scope
 from .prompt import build_system_prompt
 from .tools import TOOLS, handle_tool_calls
 from .vertex import vertex_client
@@ -48,8 +47,7 @@ def stream_chat(
     )
     client = vertex_client()
 
-    with conversation_scope(conversation_id):
-        yield from _stream_loop(client, settings, messages)
+    yield from _stream_loop(client, settings, messages, conversation_id)
 
 
 def _stream_once(client, settings, messages: list):
@@ -89,7 +87,9 @@ def _stream_once(client, settings, messages: list):
     return tool_calls, finish_reason
 
 
-def _stream_loop(client, settings, messages: list) -> Iterator[str]:
+def _stream_loop(
+    client, settings, messages: list, conversation_id: int | None = None
+) -> Iterator[str]:
     for _ in range(settings.max_tool_iterations):
         tool_calls, finish_reason = yield from _stream_once(client, settings, messages)
         if finish_reason != "tool_calls":
@@ -111,7 +111,7 @@ def _stream_loop(client, settings, messages: list) -> Iterator[str]:
                 ],
             }
         )
-        messages.extend(handle_tool_calls(tool_calls))
+        messages.extend(handle_tool_calls(tool_calls, conversation_id))
 
     # Safety valve: too many tool rounds. Ask once more with no tools available
     # so the model is forced to produce a text answer (non-streamed).

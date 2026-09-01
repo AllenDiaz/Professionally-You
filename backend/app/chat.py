@@ -15,7 +15,6 @@ import logging
 
 from . import guardrails
 from .config import get_settings
-from .context import conversation_scope
 from .prompt import build_system_prompt, get_person_name
 from .tools import TOOLS, handle_tool_calls
 from .vertex import vertex_client
@@ -30,8 +29,8 @@ def run_chat(
 ) -> str:
     """Run a full chat turn (including tool calls) and return the reply text.
 
-    ``conversation_id`` is exposed to tool handlers via a context var so any
-    lead / unknown-question they record is linked to this conversation.
+    ``conversation_id`` is threaded down to tool handlers so any lead /
+    unknown-question they record is linked to this conversation.
     """
     settings = get_settings()
     history = history or []
@@ -50,30 +49,29 @@ def run_chat(
 
     client = vertex_client()
 
-    with conversation_scope(conversation_id):
-        draft = _run_loop(client, settings, messages)
+    draft = _run_loop(client, settings, messages, conversation_id)
 
-        acceptable, feedback = guardrails.evaluate_reply(
-            get_person_name(), system_prompt, message, draft
-        )
-        if acceptable:
-            return draft
+    acceptable, feedback = guardrails.evaluate_reply(
+        get_person_name(), system_prompt, message, draft
+    )
+    if acceptable:
+        return draft
 
-        logger.info("Evaluator rejected draft reply; retrying once: %s", feedback)
-        messages.append({"role": "assistant", "content": draft})
-        messages.append(
-            {
-                "role": "user",
-                "content": (
-                    "Your previous reply failed an internal quality check: "
-                    f"{feedback}\nPlease provide a corrected reply."
-                ),
-            }
-        )
-        return _run_loop(client, settings, messages)
+    logger.info("Evaluator rejected draft reply; retrying once: %s", feedback)
+    messages.append({"role": "assistant", "content": draft})
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                "Your previous reply failed an internal quality check: "
+                f"{feedback}\nPlease provide a corrected reply."
+            ),
+        }
+    )
+    return _run_loop(client, settings, messages, conversation_id)
 
 
-def _run_loop(client, settings, messages: list) -> str:
+def _run_loop(client, settings, messages: list, conversation_id: int | None = None) -> str:
     for _ in range(settings.max_tool_iterations):
         response = client.chat.completions.create(
             model=settings.model_name, messages=messages, tools=TOOLS
@@ -81,7 +79,7 @@ def _run_loop(client, settings, messages: list) -> str:
         choice = response.choices[0]
         if choice.finish_reason == "tool_calls":
             messages.append(choice.message)
-            messages.extend(handle_tool_calls(choice.message.tool_calls))
+            messages.extend(handle_tool_calls(choice.message.tool_calls, conversation_id))
             continue
         return choice.message.content or ""
 

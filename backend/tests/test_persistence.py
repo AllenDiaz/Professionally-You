@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 
 import app.routers.chat as chat_router
 from app import crud
-from app.context import conversation_scope
 from app.db import SessionLocal
 from app.main import app
 from app.models import Conversation, Lead, Message, UnknownQuestion
@@ -50,8 +49,7 @@ def test_record_user_details_persists_lead(monkeypatch):
         db.commit()
         cid = conversation.id
 
-    with conversation_scope(cid):
-        record_user_details(email="a@b.com", name="Ada", notes="keen")
+    record_user_details(email="a@b.com", name="Ada", notes="keen", conversation_id=cid)
 
     with SessionLocal() as db:
         lead = db.query(Lead).one()
@@ -68,4 +66,4 @@ def test_record_unknown_question_persists(monkeypatch):
     with SessionLocal() as db:
         unknown = db.query(UnknownQuestion).one()
     assert "meaning of life" in unknown.question
-    assert unknown.conversation_id is None  # no active conversation scope
+    assert unknown.conversation_id is None  # no conversation_id passed
