@@ -29,8 +29,7 @@ After changing the profile or LinkedIn PDF, call `POST /api/profile/reindex` to 
 
 - `app/models.py` + `app/db.py` — SQLAlchemy models and engine. **SQLite by default**; set `DATABASE_URL` to a Postgres URL in prod.
 - `app/crud.py` — data-access helpers.
-- `app/context.py` — carries the active conversation id to tool handlers.
-- Tools now **persist** to the DB (leads, unknown questions) in addition to Pushover.
+- `app/tools.py` — the conversation id is threaded explicitly into tool calls (`record_user_details`, `record_unknown_question`), which now **persist** to the DB (leads, unknown questions) in addition to Pushover.
 - `POST /api/chat` now persists the conversation + both messages and returns a `conversation_id` (pass it back to continue a conversation).
 - `app/routers/admin.py` — bearer-token-guarded (`ADMIN_TOKEN`):
   - `GET /api/admin/leads`
