@@ -39,6 +39,7 @@ services:
     volumes:
       - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
       - ./me:/app/me:ro
+      - proyou-api-data:/app/data
     ports:
       - "8000:8000"
     depends_on:
@@ -64,3 +65,4 @@ services:
 
 volumes:
   proyou-db-data:
+  proyou-api-data:

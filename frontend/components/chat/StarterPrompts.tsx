@@ -1,8 +1,8 @@
 const PROMPTS = [
-  "tell me about your ML experience",
-  "why nyc?",
+  "tell me about your background",
+  "what are the projects you already built?",
   "got a project you're proud of?",
-  "what's your data engineering stack?",
+  "what's your strengths and weaknesses?",
 ];
 
 export function StarterPrompts({ onSelect }: { onSelect: (prompt: string) => void }) {
